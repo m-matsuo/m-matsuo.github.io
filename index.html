@@ -2,45 +2,69 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Boxcel 2Dクォータービュー＋着せ替えデモ</title>
+<title>Boxcel デモ（スマホUI＋3D視点＋方向転換）</title>
 <style>
   body { margin:0; overflow:hidden; }
   canvas { display:block; background:#aee1ff; }
-  #ui { position:absolute; top:10px; left:10px; z-index:10; }
-  #ui button { margin:2px; padding:2px 6px; font-size:12px; }
-  #joystick { position:absolute; bottom:50px; left:50px; width:120px; height:120px; border-radius:50%; background: rgba(200,200,200,0.3); touch-action:none; }
-  #stick { position:absolute; left:50%; top:50%; width:60px; height:60px; margin-left:-30px; margin-top:-30px; border-radius:50%; background:rgba(100,100,100,0.5); }
+  #ui {
+    position:absolute; top:10px; left:10px; z-index:10;
+    display:flex; flex-direction: column; gap:6px;
+  }
+  #ui button {
+    padding:10px 16px; font-size:18px; border-radius:6px;
+    background: rgba(255,255,255,0.8); border:1px solid #aaa;
+  }
+  #joystick {
+    position:absolute; bottom:50px; left:50px; width:120px; height:120px;
+    border-radius:50%; background: rgba(200,200,200,0.3); touch-action:none;
+  }
+  #stick {
+    position:absolute; left:50%; top:50%; width:60px; height:60px;
+    margin-left:-30px; margin-top:-30px; border-radius:50%; background:rgba(100,100,100,0.5);
+  }
 </style>
 </head>
 <body>
 <div id="ui">
-  <button id="switch">切替 2D/3D</button>
-  <div>服:</div>
-  <button onclick="changeColor('clothes',0x0033ff)">青</button>
-  <button onclick="changeColor('clothes',0xff33ff)">ピンク</button>
-  <div>頭:</div>
-  <button onclick="changeColor('head',0xff6666)">赤</button>
-  <button onclick="changeColor('head',0xffff00)">黄</button>
+  <button id="switch">2D / 3D 切替</button>
 </div>
 <div id="joystick"><div id="stick"></div></div>
 <canvas id="gameCanvas"></canvas>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/controls/OrbitControls.js';
 
 const canvas = document.getElementById('gameCanvas');
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 const scene = new THREE.Scene();
-const clock = new THREE.Clock();
+scene.add(new THREE.AmbientLight(0xffffff,1));
 
 const camera2D = new THREE.OrthographicCamera(-200,200,200,-200,0.1,1000);
 const camera3D = new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.1,2000);
 
+const controls = new OrbitControls(camera3D, renderer.domElement);
+controls.enablePan=false; controls.enableZoom=false;
 let mode="2D";
+let allowCameraControl=false;
+controls.enabled = allowCameraControl;
 
-scene.add(new THREE.AmbientLight(0xffffff,1));
+// === Boxcelモデル ===
+const boxcel = new THREE.Group();
+const clothes = new THREE.Mesh(new THREE.BoxGeometry(20,30,10), new THREE.MeshBasicMaterial({color:0x0033ff}));
+clothes.position.y=40;
+const head = new THREE.Mesh(new THREE.BoxGeometry(20,10,20), new THREE.MeshBasicMaterial({color:0xff6666}));
+head.position.y=55;
+const leftArm = new THREE.Mesh(new THREE.BoxGeometry(5,20,5), new THREE.MeshBasicMaterial({color:0xffaaaa}));
+leftArm.position.set(-12,45,0);
+const rightArm = leftArm.clone(); rightArm.position.x=12;
+const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(5,18,5), new THREE.MeshBasicMaterial({color:0xaaaaff}));
+leftLeg.position.set(-7,21,0);
+const rightLeg = leftLeg.clone(); rightLeg.position.x=7;
+boxcel.add(clothes,head,leftArm,rightArm,leftLeg,rightLeg);
+scene.add(boxcel);
 
 // === 簡易マップ ===
 const blockSize=20;
@@ -61,8 +85,8 @@ ground.rotation.x=-Math.PI/2;
 scene.add(ground);
 
 function createMap(){
-  for(let z=0;z<mapData.length;z++){
-    for(let x=0;x<mapData[z].length;x++){
+  for(let z=0; z<mapData.length; z++){
+    for(let x=0; x<mapData[z].length; x++){
       if(mapData[z][x]==="#"){
         const wall=new THREE.Mesh(
           new THREE.BoxGeometry(blockSize,blockSize,blockSize),
@@ -77,21 +101,6 @@ function createMap(){
 }
 createMap();
 
-// === Boxcelモデル ===
-const boxcel = new THREE.Group();
-const clothes = new THREE.Mesh(new THREE.BoxGeometry(20,30,10), new THREE.MeshBasicMaterial({color:0x0033ff}));
-clothes.position.y=40;
-const head = new THREE.Mesh(new THREE.BoxGeometry(20,10,20), new THREE.MeshBasicMaterial({color:0xff6666}));
-head.position.y=55;
-const leftArm = new THREE.Mesh(new THREE.BoxGeometry(5,20,5), new THREE.MeshBasicMaterial({color:0xffaaaa}));
-leftArm.position.set(-12,45,0);
-const rightArm = leftArm.clone(); rightArm.position.x=12;
-const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(5,18,5), new THREE.MeshBasicMaterial({color:0xaaaaff}));
-leftLeg.position.set(-7,21,0);
-const rightLeg = leftLeg.clone(); rightLeg.position.x=7;
-boxcel.add(clothes,head,leftArm,rightArm,leftLeg,rightLeg);
-scene.add(boxcel);
-
 // === 移動・ジョイスティック ===
 const keys={};
 const speed=3;
@@ -103,7 +112,7 @@ let touchId=null;
 
 function animateWalk(isMoving){
   if(isMoving){
-    walkCycle+=clock.getDelta()*10;
+    walkCycle+=0.02;
     const swing=Math.sin(walkCycle)*0.6;
     leftArm.rotation.x=swing;
     rightArm.rotation.x=-swing;
@@ -126,8 +135,7 @@ function checkCollision(nextPos){
 // === カメラ更新 ===
 function updateCameras(){
   if(mode==="2D"){
-    // 45度クォータービュー
-    const offset = new THREE.Vector3(150, 120, 150);
+    const offset=new THREE.Vector3(150,120,150);
     camera2D.position.copy(boxcel.position.clone().add(offset));
     camera2D.lookAt(boxcel.position.x, boxcel.position.y, boxcel.position.z);
   }else{
@@ -142,37 +150,49 @@ function animate(){
   requestAnimationFrame(animate);
   const next=boxcel.position.clone();
   let moving=false;
+  let moveDir=null;
 
-  // キーボード
-  if(keys["ArrowRight"]) { next.x+=speed; moving=true; }
-  if(keys["ArrowLeft"])  { next.x-=speed; moving=true; }
-  if(keys["ArrowUp"])    { next.z-=speed; moving=true; }
-  if(keys["ArrowDown"])  { next.z+=speed; moving=true; }
+  if(keys["ArrowRight"]) { next.x+=speed; moving=true; moveDir="right"; }
+  if(keys["ArrowLeft"])  { next.x-=speed; moving=true; moveDir="left"; }
+  if(keys["ArrowUp"])    { next.z-=speed; moving=true; moveDir="up"; }
+  if(keys["ArrowDown"])  { next.z+=speed; moving=true; moveDir="down"; }
 
-  // ジョイスティック
   if(joyVector.x!==0 || joyVector.y!==0){
     next.x+=joyVector.x*speed;
     next.z+=joyVector.y*speed;
     moving=true;
+    moveDir="joy";
   }
 
   if(!checkCollision(next)) boxcel.position.copy(next);
 
+  // 移動方向に応じてBoxcel回転
+  if(moveDir){
+    if(moveDir==="right") boxcel.rotation.y=0;
+    else if(moveDir==="left") boxcel.rotation.y=Math.PI;
+    else if(moveDir==="up") boxcel.rotation.y=-Math.PI/2;
+    else if(moveDir==="down") boxcel.rotation.y=Math.PI/2;
+    else if(moveDir==="joy"){
+      const angle=Math.atan2(joyVector.x,-joyVector.y); // Z軸基準
+      boxcel.rotation.y=angle;
+    }
+  }
+
   animateWalk(moving);
   updateCameras();
+  controls.update();
   renderer.render(scene,mode==="2D"?camera2D:camera3D);
 }
 animate();
 
 // === UI & イベント ===
-document.getElementById("switch").addEventListener("click",()=>{mode=mode==="2D"?"3D":"2D";});
-window.addEventListener("resize",()=>{
-  renderer.setSize(window.innerWidth,window.innerHeight);
-  camera3D.aspect=window.innerWidth/window.innerHeight; 
-  camera3D.updateProjectionMatrix();
+document.getElementById("switch").addEventListener("click",()=>{
+  mode = mode==="2D"?"3D":"2D";
+  allowCameraControl = (mode==="3D");
+  controls.enabled = allowCameraControl;
+  if(mode==="2D") boxcel.rotation.y=0;
 });
 
-// キーボード
 window.addEventListener("keydown",e=>keys[e.key]=true);
 window.addEventListener("keyup",e=>keys[e.key]=false);
 
@@ -189,33 +209,25 @@ function handleStickMove(touch){
   joyVector.y=y/max;
 }
 joystick.addEventListener("touchstart",e=>{
-  const t=e.changedTouches[0];
-  touchId=t.identifier;
-  handleStickMove(t);
+  const t=e.changedTouches[0]; touchId=t.identifier; handleStickMove(t);
 });
 joystick.addEventListener("touchmove",e=>{
-  for(const t of e.changedTouches){
-    if(t.identifier===touchId) handleStickMove(t);
-  }
+  for(const t of e.changedTouches) if(t.identifier===touchId) handleStickMove(t);
 });
 joystick.addEventListener("touchend",e=>{
   for(const t of e.changedTouches){
     if(t.identifier===touchId){
-      touchId=null;
-      joyVector.x=joyVector.y=0;
+      touchId=null; joyVector.x=joyVector.y=0;
       stick.style.transform=`translate(0px,0px)`;
     }
   }
 });
 
-// === 着せ替え関数 ===
-window.changeColor=(part,color)=>{
-  switch(part){
-    case "clothes": clothes.material.color.set(color); break;
-    case "head": head.material.color.set(color); break;
-  }
-};
-
+window.addEventListener("resize",()=>{
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  camera3D.aspect=window.innerWidth/window.innerHeight;
+  camera3D.updateProjectionMatrix();
+});
 </script>
 </body>
 </html>
