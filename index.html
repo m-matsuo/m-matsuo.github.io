@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Boxcel リアルタイム着せ替えデモ</title>
+<title>Boxcel 2Dクォータービュー＋着せ替えデモ</title>
 <style>
   body { margin:0; overflow:hidden; }
   canvas { display:block; background:#aee1ff; }
@@ -126,8 +126,10 @@ function checkCollision(nextPos){
 // === カメラ更新 ===
 function updateCameras(){
   if(mode==="2D"){
-    camera2D.position.set(boxcel.position.x,150,200);
-    camera2D.lookAt(boxcel.position.x,0,0);
+    // 45度クォータービュー
+    const offset = new THREE.Vector3(150, 120, 150);
+    camera2D.position.copy(boxcel.position.clone().add(offset));
+    camera2D.lookAt(boxcel.position.x, boxcel.position.y, boxcel.position.z);
   }else{
     const offset=new THREE.Vector3(0,120,180);
     camera3D.position.copy(boxcel.position.clone().add(offset));
@@ -164,7 +166,11 @@ animate();
 
 // === UI & イベント ===
 document.getElementById("switch").addEventListener("click",()=>{mode=mode==="2D"?"3D":"2D";});
-window.addEventListener("resize",()=>{renderer.setSize(window.innerWidth,window.innerHeight); camera3D.aspect=window.innerWidth/window.innerHeight; camera3D.updateProjectionMatrix();});
+window.addEventListener("resize",()=>{
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  camera3D.aspect=window.innerWidth/window.innerHeight; 
+  camera3D.updateProjectionMatrix();
+});
 
 // キーボード
 window.addEventListener("keydown",e=>keys[e.key]=true);
